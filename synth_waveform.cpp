@@ -34,6 +34,22 @@
 //#define IMPROVE_EXPONENTIAL_ACCURACY
 #define BASE_AMPLITUDE 0x6000  // 0x7fff won't work due to Gibb's phenomenon, so use 3/4 of full range.
 
+static int16_t polyblep(uint32_t phase, uint32_t inc, int32_t magnitude){
+
+	//0 <= t < 1
+	if (phase < inc){
+		float t = (float) phase/inc;
+		return (int16_t) magnitude * (t*t - t+t - 1.0);
+	} else {
+		//-1 < t < 0
+		if(phase > (UINT32_MAX - inc) ){
+			float t = (float) (phase - UINT32_MAX) /inc;
+			return (int16_t) magnitude * (t*t + t+t + 1.0);
+		} else {
+			return 0;
+		}
+	}
+}
 
 
 void AudioSynthWaveform::update(void)
@@ -60,9 +76,14 @@ void AudioSynthWaveform::update(void)
 	switch(tone_type) {
 	case WAVEFORM_SINE:
 		for (i=0; i < AUDIO_BLOCK_SAMPLES; i++) {
+
+			/* only use upper 8 bit to access index */
 			index = ph >> 24;
+
 			val1 = AudioWaveformSine[index];
 			val2 = AudioWaveformSine[index+1];
+			
+			/* interpolate between two values and set block data */
 			scale = (ph >> 8) & 0xFFFF;
 			val2 *= scale;
 			val1 *= 0x10000 - scale;
@@ -115,8 +136,10 @@ void AudioSynthWaveform::update(void)
 		break;
 
 	case WAVEFORM_SAWTOOTH:
+		// magnitude15 = signed_saturate_rshift(magnitude, 16, 1);
 		for (i=0; i < AUDIO_BLOCK_SAMPLES; i++) {
 			*bp++ = signed_multiply_32x16t(magnitude, ph);
+			// *bp++ -= polyblep(ph + , inc, magnitude15);
 			ph += inc;
 		}
 		break;
