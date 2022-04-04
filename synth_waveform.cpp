@@ -34,24 +34,6 @@
 //#define IMPROVE_EXPONENTIAL_ACCURACY
 #define BASE_AMPLITUDE 0x6000  // 0x7fff won't work due to Gibb's phenomenon, so use 3/4 of full range.
 
-static int16_t polyblep(uint32_t phase, uint32_t inc, int32_t magnitude){
-
-	//0 <= t < 1
-	if (phase < inc){
-		float t = (float) phase/inc;
-		return (int16_t) magnitude * (t*t - t+t - 1.0);
-	} else {
-		//-1 < t < 0
-		if(phase > (UINT32_MAX - inc) ){
-			float t = (float) (phase - UINT32_MAX) /inc;
-			return (int16_t) magnitude * (t*t + t+t + 1.0);
-		} else {
-			return 0;
-		}
-	}
-}
-
-
 void AudioSynthWaveform::update(void)
 {
 	audio_block_t *block;
