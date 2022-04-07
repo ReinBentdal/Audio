@@ -105,6 +105,33 @@ static void applyGainThenAdd(int16_t *dst, const int16_t *src, int32_t mult)
 
 #endif
 
+template<int MIXER_SIZE>
+void AudioMixer<MIXER_SIZE>::update(void)
+{
+	audio_block_t *in, *out=NULL;
+	unsigned int channel;
+
+	for (channel=0; channel < MIXER_SIZE; channel++) {
+		if (!out) {
+			out = receiveWritable(channel);
+			if (out) {
+				int32_t mult = multiplier[channel];
+				if (mult != MULTI_UNITYGAIN) applyGain(out->data, mult);
+			}
+		} else {
+			in = receiveReadOnly(channel);
+			if (in) {
+				applyGainThenAdd(out->data, in->data, multiplier[channel]);
+				release(in);
+			}
+		}
+	}
+	if (out) {
+		transmit(out);
+		release(out);
+	}
+}
+
 void AudioMixer4::update(void)
 {
 	audio_block_t *in, *out=NULL;

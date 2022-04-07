@@ -30,6 +30,43 @@
 #include "Arduino.h"
 #include "AudioStream.h"
 
+template<int MIXER_SIZE>
+class AudioMixer : public AudioStream
+{
+#if defined(__ARM_ARCH_7EM__)
+public:
+	AudioMixer(void) : AudioStream(MIXER_SIZE, inputQueueArray) {
+		for (int i=0; i<MIXER_SIZE; i++) multiplier[i] = 65536;
+	}
+	virtual void update(void);
+	void gain(unsigned int channel, float gain) {
+		if (channel >= MIXER_SIZE) return;
+		if (gain > 32767.0f) gain = 32767.0f;
+		else if (gain < -32767.0f) gain = -32767.0f;
+		multiplier[channel] = gain * 65536.0f; // TODO: proper roundoff?
+	}
+private:
+	int32_t multiplier[MIXER_SIZE];
+	audio_block_t *inputQueueArray[MIXER_SIZE];
+
+#elif defined(KINETISL)
+public:
+	AudioMixer4(void) : AudioStream(MIXER_SIZE, inputQueueArray) {
+		for (int i=0; i<MIXER_SIZE; i++) multiplier[i] = 256;
+	}
+	virtual void update(void);
+	void gain(unsigned int channel, float gain) {
+		if (channel >= MIXER_SIZE) return;
+		if (gain > 127.0f) gain = 127.0f;
+		else if (gain < -127.0f) gain = -127.0f;
+		multiplier[channel] = gain * 256.0f; // TODO: proper roundoff?
+	}
+private:
+	int16_t multiplier[MIXER_SIZE];
+	audio_block_t *inputQueueArray[MIXER_SIZE];
+#endif
+};
+
 class AudioMixer4 : public AudioStream
 {
 #if defined(__ARM_ARCH_7EM__)
