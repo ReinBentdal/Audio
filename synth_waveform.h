@@ -101,10 +101,12 @@ public:
     , phase_offset(0)
     , magnitude(0)
     , pulse_width(0x40000000)
-    , arbdata(NULL)
     , sample(0)
-    , tone_type(WAVEFORM_SINE)
-    , tone_offset(0)
+    , waveform_type(WAVEFORM_SINE)
+    , waveform_offset(0)
+    , arbitrary_waveform(NULL)
+    // , lp_a{1.f, -2.63701202f,  2.84045336f, -1.43627565f,  0.28497052f}
+    // , lp_b{0.00325664f, 0.01302655f, 0.01953983f, 0.01302655f, 0.00325664}
   {}
 
   /**
@@ -115,17 +117,7 @@ public:
    * This means the stream will in worst case only contain two samples from the
    * wave array
    */
-  void frequency(float freq)
-  {
-    if (freq < 0.0f) {
-      freq = 0.0;
-    } else if (freq > AUDIO_SAMPLE_RATE_EXACT / 2.0f) {
-      freq = AUDIO_SAMPLE_RATE_EXACT / 2.0f;
-    }
-    phase_increment = freq * ((float)UINT32_MAX / AUDIO_SAMPLE_RATE_EXACT);
-    if (phase_increment > UINT32_MAX / 2)
-      phase_increment = UINT32_MAX / 2;
-  }
+  void frequency(float freq);
   void phase(float angle)
   {
     if (angle < 0.0f) {
@@ -153,7 +145,7 @@ public:
     } else if (n > 1.0f) {
       n = 1.0f;
     }
-    tone_offset = n * 32767.0f;
+    waveform_offset = n * 32767.0f;
   }
   void pulseWidth(float n)
   { // 0.0 to 1.0
@@ -167,7 +159,7 @@ public:
   void begin(short t_type)
   {
     phase_offset = 0;
-    tone_type = t_type;
+    waveform_type = t_type;
     if (t_type == WAVEFORM_BANDLIMIT_SQUARE)
       band_limit_waveform.init_square(phase_increment);
     else if (t_type == WAVEFORM_BANDLIMIT_PULSE)
@@ -183,7 +175,7 @@ public:
     phase_offset = 0;
     begin(t_type);
   }
-  void arbitraryWaveform(const int16_t* data, float maxFreq) { arbdata = data; }
+  void arbitraryWaveform(const int16_t* data) { arbitrary_waveform = data; }
   virtual void update(void);
 
 private:
@@ -192,11 +184,14 @@ private:
   uint32_t phase_offset;
   int32_t magnitude;
   uint32_t pulse_width;
-  const int16_t* arbdata;
   int16_t sample; // for WAVEFORM_SAMPLE_HOLD
-  short tone_type;
-  int16_t tone_offset;
+  short waveform_type;
+  int16_t waveform_offset;
   BandLimitedWaveform band_limit_waveform;
+
+  const int16_t* arbitrary_waveform;
+  // float lp_a[5];
+  // float lp_b[5];
 };
 
 class AudioSynthWaveformModulated : public AudioStream
@@ -208,10 +203,10 @@ public:
     , phase_increment(0)
     , modulation_factor(32768)
     , magnitude(0)
-    , arbdata(NULL)
+    , arbitrary_waveform(NULL)
     , sample(0)
-    , tone_offset(0)
-    , tone_type(WAVEFORM_SINE)
+    , waveform_offset(0)
+    , waveform_type(WAVEFORM_SINE)
     , modulation_type(0)
   {}
 
@@ -244,12 +239,12 @@ public:
     } else if (n > 1.0f) {
       n = 1.0f;
     }
-    tone_offset = n * 32767.0f;
+    waveform_offset = n * 32767.0f;
   }
 
   void begin(short t_type)
   {
-    tone_type = t_type;
+    waveform_type = t_type;
     if (t_type == WAVEFORM_BANDLIMIT_SQUARE)
       band_limit_waveform.init_square(phase_increment);
     else if (t_type == WAVEFORM_BANDLIMIT_PULSE)
@@ -266,7 +261,7 @@ public:
     begin(t_type);
   }
 
-  void arbitraryWaveform(const int16_t* data, float maxFreq) { arbdata = data; }
+  void arbitraryWaveform(const int16_t* data, float maxFreq) { arbitrary_waveform = data; }
   void frequencyModulation(float octaves)
   {
     if (octaves > 12.0f) {
@@ -297,11 +292,11 @@ private:
   uint32_t phase_increment;
   uint32_t modulation_factor;
   int32_t magnitude;
-  const int16_t* arbdata;
+  const int16_t* arbitrary_waveform;
   uint32_t phasedata[AUDIO_BLOCK_SAMPLES];
   int16_t sample; // for WAVEFORM_SAMPLE_HOLD
-  int16_t tone_offset;
-  uint8_t tone_type;
+  int16_t waveform_offset;
+  uint8_t waveform_type;
   uint8_t modulation_type;
   BandLimitedWaveform band_limit_waveform;
 };

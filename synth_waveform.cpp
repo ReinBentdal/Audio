@@ -34,6 +34,20 @@
 //#define IMPROVE_EXPONENTIAL_ACCURACY
 #define BASE_AMPLITUDE 0x6000  // 0x7fff won't work due to Gibb's phenomenon, so use 3/4 of full range.
 
+void AudioSynthWaveform::frequency(float freq)
+{
+	
+	/* update phase incrementer */
+	if (freq < 0.0f) {
+		freq = 0.0;
+	} else if (freq > AUDIO_SAMPLE_RATE_EXACT / 2.0f) {
+		freq = AUDIO_SAMPLE_RATE_EXACT / 2.0f;
+	}
+	phase_increment = freq * ((float)UINT32_MAX / AUDIO_SAMPLE_RATE_EXACT);
+	if (phase_increment > UINT32_MAX / 2)
+		phase_increment = UINT32_MAX / 2;
+}
+
 void AudioSynthWaveform::update(void)
 {
 	audio_block_t *block;
@@ -55,7 +69,7 @@ void AudioSynthWaveform::update(void)
 	}
 	bp = block->data;
 
-	switch(tone_type) {
+	switch(waveform_type) {
 	case WAVEFORM_SINE:
 		for (i=0; i < AUDIO_BLOCK_SAMPLES; i++) {
 
@@ -75,7 +89,7 @@ void AudioSynthWaveform::update(void)
 		break;
 
 	case WAVEFORM_ARBITRARY:
-		if (!arbdata) {
+		if (!arbitrary_waveform) {
 			release(block);
 			phase_accumulator += inc * AUDIO_BLOCK_SAMPLES;
 			return;
@@ -85,8 +99,8 @@ void AudioSynthWaveform::update(void)
 			index = ph >> 24;
 			index2 = index + 1;
 			if (index2 >= 256) index2 = 0;
-			val1 = *(arbdata + index);
-			val2 = *(arbdata + index2);
+			val1 = *(arbitrary_waveform + index);
+			val2 = *(arbitrary_waveform + index2);
 			scale = (ph >> 8) & 0xFFFF;
 			val2 *= scale;
 			val1 *= 0x10000 - scale;
@@ -139,7 +153,7 @@ void AudioSynthWaveform::update(void)
 		{
 		  uint32_t new_ph = ph + inc ;
 		  int16_t val = band_limit_waveform.generate_sawtooth (new_ph, i) ;
-		  if (tone_type == WAVEFORM_BANDLIMIT_SAWTOOTH_REVERSE)
+		  if (waveform_type == WAVEFORM_BANDLIMIT_SAWTOOTH_REVERSE)
 		    *bp++ = (val * -magnitude) >> 16 ;
 		  else
 		    *bp++ = (val * magnitude) >> 16 ;
@@ -214,12 +228,12 @@ void AudioSynthWaveform::update(void)
 	}
 	phase_accumulator = ph - phase_offset;
 
-	if (tone_offset) {
+	if (waveform_offset) {
 		bp = block->data;
 		end = bp + AUDIO_BLOCK_SAMPLES;
 		do {
 			val1 = *bp;
-			*bp++ = signed_saturate_rshift(val1 + tone_offset, 16, 0);
+			*bp++ = signed_saturate_rshift(val1 + waveform_offset, 16, 0);
 		} while (bp < end);
 	}
 	transmit(block, 0);
@@ -312,7 +326,7 @@ void AudioSynthWaveformModulated::update(void)
 	bp = block->data;
 
 	// Now generate the output samples using the pre-computed phase angles
-	switch(tone_type) {
+	switch(waveform_type) {
 	case WAVEFORM_SINE:
 		for (i=0; i < AUDIO_BLOCK_SAMPLES; i++) {
 			ph = phasedata[i];
@@ -327,7 +341,7 @@ void AudioSynthWaveformModulated::update(void)
 		break;
 
 	case WAVEFORM_ARBITRARY:
-		if (!arbdata) {
+		if (!arbitrary_waveform) {
 			release(block);
 			if (shapedata) release(shapedata);
 			return;
@@ -338,8 +352,8 @@ void AudioSynthWaveformModulated::update(void)
 			index = ph >> 24;
 			index2 = index + 1;
 			if (index2 >= 256) index2 = 0;
-			val1 = *(arbdata + index);
-			val2 = *(arbdata + index2);
+			val1 = *(arbitrary_waveform + index);
+			val2 = *(arbitrary_waveform + index2);
 			scale = (ph >> 8) & 0xFFFF;
 			val2 *= scale;
 			val1 *= 0x10000 - scale;
@@ -410,7 +424,7 @@ void AudioSynthWaveformModulated::update(void)
 		{
 		  int16_t val = band_limit_waveform.generate_sawtooth (phasedata[i], i) ;
 		  val = (int16_t) ((val * magnitude) >> 16) ;
-		  *bp++ = tone_type == WAVEFORM_BANDLIMIT_SAWTOOTH_REVERSE ? (int16_t) -val : (int16_t) +val ;
+		  *bp++ = waveform_type == WAVEFORM_BANDLIMIT_SAWTOOTH_REVERSE ? (int16_t) -val : (int16_t) +val ;
 		}
 		break;
 
@@ -461,12 +475,12 @@ void AudioSynthWaveformModulated::update(void)
 		break;
 	}
 
-	if (tone_offset) {
+	if (waveform_offset) {
 		bp = block->data;
 		end = bp + AUDIO_BLOCK_SAMPLES;
 		do {
 			val1 = *bp;
-			*bp++ = signed_saturate_rshift(val1 + tone_offset, 16, 0);
+			*bp++ = signed_saturate_rshift(val1 + waveform_offset, 16, 0);
 		} while (bp < end);
 	}
 	if (shapedata) release(shapedata);
